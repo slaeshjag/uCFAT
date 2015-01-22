@@ -1,0 +1,60 @@
+***** µCFAT *****
+This is a small-ish implementation of FAT16/32.
+It is intended for microcontrollers with a limited amount
+of RAM. Thus, where possible, performance has been sacrificed
+for a smaller memory footprint where possible. As a result, about
+a kB is the minimum amount of RAM needed to use µCFAT, although
+you'll need more than that to really do anything with the data you
+load. It was specifically written to be used on an LPC1114 cortex M0
+microcontroller, however, no microcontroller specific features are
+used. It has two hooks, read_sector() and write_sector() that you
+modify to use your block device code (ie. SD card code.)
+
+You also need to give it a buffer the size of one sector
+(512 Bytes,) which you provide by setting the global pointer
+sector_buff. The contents of this buffer is only defined
+after a read operation, all other calls will trash it with
+temporary data.
+
+Before any operations can be done, fat_init() must be called.
+If any read/write errors are encountered, fat_init() will need
+to be called again. This will invalidate all open file descriptors.
+A failing read/write can be used to implement basic hot-swap support,
+as the new media will not be initialized on an interface level.
+
+Requirements:
+	* A C99 compatible C compiler (stdint, stdbool are used)
+	* At least 1 kB of µC RAM
+	* An interface for reading/writing sectors
+	* About 4 kB of available ROM for fat.c (compiled with -Os, THUMB)
+
+Features:
+	* Provides an interface for basic FS operation
+	* Read files (a sector at a time)
+	* Write files (a sector at a time)
+	* Seek in files (in sector increments)
+	* Create/delete files/folders
+		- To create a folder, use file attribute 0x10
+		- Only empty folders can be deleted
+	* Set filesizes to a non sector-aligned number
+	* List the contents of a directory
+
+
+Limitations:
+	* Only per sector read/write/seek
+	* No long file names, only 8.3 supported
+	* Only supports 512 byte sectors.
+	* Only one sector can be read/written at a time
+	* Filesystem is case sensitive
+	* No checks are done for illegal characters in filenames
+	* A fixed maximum of open files (configurable with a #define)
+	* Does not support partition tables
+
+Protip: Compile fat.c with -Os, or the object file will be very large.
+For gcc targeting LPC1114, -O3 will produce a 14 kB object file, while
+-Os produces a 4 kB object file. Since speed will be crap anyway, this
+shouldn't be a big sacrifice.
+
+Provided is apart from the actual implementation (fat.c) also a demo
+program in main.c, which will do some basic file operations on the
+file system image given to main in argv[1].
