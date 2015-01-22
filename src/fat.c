@@ -370,9 +370,11 @@ static uint32_t locate_record(const char *path, int *record_index, const char *t
 			}
 		}
 		
-		if (!recurse)	/* Don't cross cluster boundary for root directory */
-			/* TODO: Handle */
-			return 0;
+		if (!recurse) {	/* Don't cross cluster boundary for root directory */
+			if (fat_state.type == FAT_TYPE_FAT16)
+				cur_sector++;	/* Lets just cross our fingers and hope we don't overrun */
+		}
+
 		if (cur_sector / fat_state.cluster_size != (cur_sector + 1) / fat_state.cluster_size) {
 			cur_sector = cluster_to_sector(next_cluster(sector_to_cluster(cur_sector)));
 			if (!cur_sector)
