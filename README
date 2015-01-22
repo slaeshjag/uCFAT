@@ -1,11 +1,11 @@
 ***** µCFAT *****
 This is a small-ish implementation of FAT16/32.
 It is intended for microcontrollers with a limited amount
-of RAM. Thus, where possible, performance has been sacrificed
-for a smaller memory footprint where possible. As a result, about
-a kB is the minimum amount of RAM needed to use µCFAT, although
-you'll need more than that to really do anything with the data you
-load. It was specifically written to be used on an LPC1114 cortex M0
+of RAM. Thus, performance has been sacrificed for a smaller 
+memory footprint where possible. As a result, about a kB is the
+minimum amount of RAM needed to use µCFAT, although you'll need
+more than that to really do anything with the data you load.
+It was specifically written to be used on an LPC1114 cortex M0
 microcontroller, however, no microcontroller specific features are
 used. It has two hooks, read_sector() and write_sector() that you
 modify to use your block device code (ie. SD card code.)
@@ -53,8 +53,9 @@ Limitations:
 Protip: Compile fat.c with -Os, or the object file will be very large.
 For gcc targeting LPC1114, -O3 will produce a 14 kB object file, while
 -Os produces a 4 kB object file. Since speed will be crap anyway, this
-shouldn't be a big sacrifice.
+shouldn't be a big sacrifice. There doesn't seem to be as big of a
+difference on x86 (larger binary,) so your milage may vary.
 
 Provided is apart from the actual implementation (fat.c) also a demo
-program in main.c, which will do some basic file operations on the
+program in test.c, which will do some basic file operations on the
 file system image given to main in argv[1].
