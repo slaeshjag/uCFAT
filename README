@@ -22,6 +22,9 @@ to be called again. This will invalidate all open file descriptors.
 A failing read/write can be used to implement basic hot-swap support,
 as the new media will not be initialized on an interface level.
 
+If a read/write error was encountered that resulted in the last
+error, fat_valid() will return false.
+
 Requirements:
 	* A C99 compatible C compiler (stdint, stdbool are used)
 	* At least 1 kB of µC RAM
