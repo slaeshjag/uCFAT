@@ -724,7 +724,8 @@ static bool folder_empty(uint32_t cluster) {
 
 
 bool delete_file(const char *path) {
-	uint32_t index, i;
+	uint32_t i;
+	int index;
 	uint32_t sector, cluster;
 	if (!fat_state.valid)
 		return false;
@@ -732,7 +733,7 @@ bool delete_file(const char *path) {
 	if (!sector)
 		return false;
 	for (i = 0; i < MAX_FD_OPEN; i++)
-		if (fat_fd[i].entry_sector == sector && fat_fd[i].entry_index == index && fat_fd[i].key >= 0)
+		if (fat_fd[i].entry_sector == sector && (int) fat_fd[i].entry_index == index && fat_fd[i].key >= 0)
 			return false;
 	read_sector(sector, sector_buff);
 	if (sector_buff[index * 32 + 11] & 0x10) {
