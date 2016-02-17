@@ -35,7 +35,7 @@ freely, subject to the following restrictions:
 #define	READ_DWORD(x, n)	read_dword(x, n)
 #define	WRITE_WORD(x, n, w)	((x)[(n)] = (w & 0xFF), (x)[(n) + 1] = ((w) >> 8) & 0xFF)
 #define	WRITE_DWORD(x, n, dw)	write_dword(x, n, dw)
-#define GET_ENTRY_CLUSTER(e)	((READ_WORD(sector_buff, (e) * 32 + 20) << 16) | ((READ_WORD(sector_buff, (e) * 32 + 26)) & (fat_state.type == FAT_TYPE_FAT32 ? 0xFFFF : ~0)))
+#define GET_ENTRY_CLUSTER(e)	(((READ_WORD(sector_buff, (e) * 32 + 20) << 16) | (READ_WORD(sector_buff, (e) * 32 + 26))) & (fat_state.type != FAT_TYPE_FAT32 ? 0xFFFF : ~0))
 
 static uint32_t read_dword(uint8_t *buff, int byte) {
 	uint32_t dw;
