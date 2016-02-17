@@ -35,7 +35,7 @@ freely, subject to the following restrictions:
 #define	READ_DWORD(x, n)	read_dword(x, n)
 #define	WRITE_WORD(x, n, w)	((x)[(n)] = (w & 0xFF), (x)[(n) + 1] = ((w) >> 8) & 0xFF)
 #define	WRITE_DWORD(x, n, dw)	write_dword(x, n, dw)
-#define GET_ENTRY_CLUSTER(e)	(READ_WORD(sector_buff, e * 32 + 20) << 16) | (READ_WORD(sector_buff, e * 32 + 26))
+#define GET_ENTRY_CLUSTER(e)	((READ_WORD(sector_buff, (e) * 32 + 20) << 16) | (READ_WORD(sector_buff, (e) * 32 + 26)) & (fat_state.type == FAT_TYPE_FAT32 ? 0xFFFF : ~0))
 
 static uint32_t read_dword(uint8_t *buff, int byte) {
 	uint32_t dw;
@@ -217,6 +217,12 @@ static void fname_to_fatname(char *name, char *fname) {
 		for (j = i; j < 8; j++)
 			fname[j] = ' ';
 		i++;
+		for (; j < 11 && name[i]; j++, i++)
+			fname[j] = name[i];
+		for (; j < 11; j++)
+			fname[j] = ' ';
+	} else if (i == 8 && name[i] == '.') {
+		i++, j = 8;
 		for (; j < 11 && name[i]; j++, i++)
 			fname[j] = name[i];
 		for (; j < 11; j++)
@@ -724,7 +730,8 @@ static bool folder_empty(uint32_t cluster) {
 
 
 bool delete_file(const char *path) {
-	uint32_t index, i;
+	uint32_t i;
+	int index;
 	uint32_t sector, cluster;
 	if (!fat_state.valid)
 		return false;
@@ -732,7 +739,7 @@ bool delete_file(const char *path) {
 	if (!sector)
 		return false;
 	for (i = 0; i < MAX_FD_OPEN; i++)
-		if (fat_fd[i].entry_sector == sector && fat_fd[i].entry_index == index && fat_fd[i].key >= 0)
+		if (fat_fd[i].entry_sector == sector && (int) fat_fd[i].entry_index == index && fat_fd[i].key >= 0)
 			return false;
 	read_sector(sector, sector_buff);
 	if (sector_buff[index * 32 + 11] & 0x10) {
@@ -876,6 +883,8 @@ int fat_dirlist(const char *path, struct FATDirList *list, int size, int skip) {
 		if (!(sector_buff[index * 32 + 11] & 0x10))
 			return -1;
 		cluster = GET_ENTRY_CLUSTER(index);
+		if (fat_state.type != FAT_TYPE_FAT32)
+			cluster &= 0xFFFF;
 		sector = cluster_to_sector(cluster);
 	}
 
@@ -890,7 +899,7 @@ int fat_dirlist(const char *path, struct FATDirList *list, int size, int skip) {
 					return found;
 				if (sector_buff[j * 32 + 11] == 0xF)
 					continue;
-				if (!sector_buff[j * 32 + 11] && sector_buff[j * 32] == 0xE5)
+				if (sector_buff[j * 32] == 0xE5)
 					continue;
 				if (!sector_buff[j * 32])
 					return found;
