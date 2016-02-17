@@ -30,5 +30,10 @@ void fat_set_fsize(const char *path, uint32_t size);
 int fat_dirlist(const char *path, struct FATDirList *list, int size, int skip);
 bool fat_valid();
 
+/* These should be provided by you */
+/* Returns < 0 on error */
+int write_sector_call(uint32_t sector, uint8_t *data);
+int read_sector_call(uint32_t sector, uint8_t *data);
+
 
 #endif

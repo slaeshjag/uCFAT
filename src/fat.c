@@ -193,7 +193,7 @@ int init_fat() {
 		/* Invalidate free space counter */
 		fsinfo = READ_WORD(data, 48);
 		read_sector(fsinfo, data);
-		if (READ_DWORD(data, 0) == 0x416145252 && READ_WORD(data, 510) == 0xAA55) {
+		if (READ_DWORD(data, 0) == 0x41615252 && READ_WORD(data, 510) == 0xAA55) {
 			WRITE_DWORD(data, 488, 0xFFFFFFFF);
 			write_sector(fsinfo, data);
 		}
@@ -312,7 +312,7 @@ static void dealloc_fat(uint32_t fat_entry) {
 
 static uint32_t locate_record(const char *path, int *record_index, const char *tail) {
 	char component[13], fatname[11];
-	int i;
+	int i = 0;
 	uint32_t cur_sector;
 	bool recurse = false, file = false;
 
@@ -388,7 +388,7 @@ static uint32_t locate_record(const char *path, int *record_index, const char *t
 
 
 static uint32_t alloc_cluster(uint32_t entry_sector, uint32_t entry_index, uint32_t old_cluster) {
-	int i, j;
+	uint32_t i, j;
 	uint32_t cluster = 0, avail_cluster;
 	int fat_size, ent_per_sec, eocm, mask, shift;
 	
@@ -724,7 +724,7 @@ static bool folder_empty(uint32_t cluster) {
 
 
 bool delete_file(const char *path) {
-	int index, i;
+	uint32_t index, i;
 	uint32_t sector, cluster;
 	if (!fat_state.valid)
 		return false;
@@ -886,13 +886,13 @@ int fat_dirlist(const char *path, struct FATDirList *list, int size, int skip) {
 			if ((read_sector(sector + i, sector_buff)) < 0)
 				return 0;
 			for (j = 0; j < 16; j++) {
-				if (found >= size)
+				if (found >= (uint32_t) size)
 					return found;
 				if (sector_buff[j * 32 + 11] == 0xF)
 					continue;
 				if (!sector_buff[j * 32 + 11] && sector_buff[j * 32] == 0xE5)
 					continue;
-				if (!sector_buff[j * 32 + 11] && !sector_buff[j * 32])
+				if (!sector_buff[j * 32])
 					return found;
 				if (skip) {
 					skip--;

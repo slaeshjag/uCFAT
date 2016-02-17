@@ -7,7 +7,7 @@
 
 FILE *fp;
 
-int write_sector_call(int sector, uint8_t *data) {
+int write_sector_call(uint32_t sector, uint8_t *data) {
 	fseek(fp, sector * 512, SEEK_SET);
 	if (ftell(fp) != sector * 512)
 		return -1;
@@ -18,7 +18,7 @@ int write_sector_call(int sector, uint8_t *data) {
 }
 
 
-int read_sector_call(int sector, uint8_t *data) {
+int read_sector_call(uint32_t sector, uint8_t *data) {
 	fseek(fp, sector * 512, SEEK_SET);
 	if (ftell(fp) != sector * 512)
 		return -1;
