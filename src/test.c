@@ -7,6 +7,8 @@
 
 FILE *fp;
 
+const char *attribs = "RHSLDA";
+
 int write_sector_call(uint32_t sector, uint8_t *data) {
 	fseek(fp, sector * 512, SEEK_SET);
 	if (ftell(fp) != sector * 512)
@@ -28,13 +30,23 @@ int read_sector_call(uint32_t sector, uint8_t *data) {
 	return 0;
 }
 
+static void print_filesize(uint32_t filesize) {
+	if(filesize < 1024)
+		printf("%u", filesize);
+	else if(filesize < 1024*1024)
+		printf("%uk", filesize/1024U);
+	else
+		printf("%uM", filesize/(1024U*1024U));
+}
 
 int main(int argc, char **argv) {
-	int fd, i, files, j;
+	int fd, i, files, j, k;
 	uint8_t buff[512];
-	char path[256] = "/";
+	char path[256] = "";
+	char pathbuf[256];
 	char cmdline[300] = {};
-	uint32_t size;
+	uint32_t size, tmp;
+	uint8_t stat;
 	
 	char *cmd, *filename;
 	
@@ -42,6 +54,7 @@ int main(int argc, char **argv) {
 	
 	if(argc < 2) {
 		fprintf(stderr, "Usage: test /path/to/image.img\n");
+		return 1;
 	}
 	
 	sector_buff = buff;
@@ -49,7 +62,7 @@ int main(int argc, char **argv) {
 	init_fat();
 	
 	for(;;) {
-		fputs("> ", stdout);
+		printf("%s$ ", *path ? path : "/");
 		fflush(stdout);
 		do {
 			if(!fgets(cmdline, 300, stdin))
@@ -67,33 +80,50 @@ int main(int argc, char **argv) {
 				continue;
 			if(!strcmp(filename, "..") && strcmp(path, "/")) {
 				*strrchr(path, '/') = 0;
-				*(strrchr(path, '/') + 1) = 0;
 				continue;
 			}
-				
-			strcat(path, filename);
+			
 			strcat(path, "/");
+			strcat(path, filename);
 		} else if(!strcmp(cmd, "pwd")) {
-			puts(path);
+			if(*path)
+				puts(path);
+			else
+				puts("/");
 		} else if(!strcmp(cmd, "ls")) {
 			for(files = 0; (i = fat_dirlist(path, list, 8, files)); files += i) {
 				for (j = i - 1; j >= 0; j--) {
-					if(list[j].filename[0])
-						printf("%s (0x%X)\n", list[j].filename, list[j].attrib);
+					if(list[j].filename[0]) {
+						stat = list[j].attrib;
+						for(k = 5; k != ~0; k--) {
+							if(stat & (0x1 << k))
+								putchar(attribs[k]);
+							else
+								putchar('-');
+						}
+						if(stat & 0x10) {
+							printf("\t\t");
+						} else {
+							sprintf((char *) pathbuf, "%s/%s", path, list[j].filename);
+							fd = fat_open(pathbuf, O_RDONLY);
+							printf("\t");
+							print_filesize(fat_fsize(fd));
+							printf("\t");
+							fat_close(fd);
+						}
+						printf("%s\n", list[j].filename);
+					}
 				}
 			}
 		} else if(!strcmp(cmd, "cat")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
 			
-			sprintf((char *) buff, "%s%s", path, filename);
-			printf("%s\n", buff);
-			if((fd = fat_open((char *) buff, O_RDONLY)) < 0)
+			sprintf((char *) pathbuf, "%s/%s", path, filename);
+			if((fd = fat_open((char *) pathbuf, O_RDONLY)) < 0)
 				continue;
 			
-			printf("will do\n");
-			
-			for(size = fat_fsize(fd); !(size%512); size -= 512) {
+			for(size = fat_fsize(fd); (size/512); size -= 512) {
 				fat_read_sect(fd);
 				fwrite(sector_buff, 1, 512, stdout);
 			}
@@ -103,35 +133,74 @@ int main(int argc, char **argv) {
 			}
 			
 			fat_close(fd);
+		} else if(!strcmp(cmd, "rm")) {
+			if(!(filename = strtok(NULL, " \r\n")))
+				continue;
+			
+			sprintf((char *) pathbuf, "%s/%s", path, filename);
+			if(fat_get_stat(pathbuf) & 0x10) {
+				fprintf(stderr, "Error: cannot rm directory\n");
+				continue;
+			}
+			delete_file(pathbuf);
+		} else if(!strcmp(cmd, "touch")) {
+			if(!(filename = strtok(NULL, " \r\n")))
+				continue;
+			
+			create_file(path, filename, 0x20);
+		} else if(!strcmp(cmd, "mkdir")) {
+			if(!(filename = strtok(NULL, " \r\n")))
+				continue;
+			
+			create_file(path, filename, 0x10);
+		} else if(!strcmp(cmd, "rmdir")) {
+			if(!(filename = strtok(NULL, " \r\n")))
+				continue;
+			
+			sprintf((char *) pathbuf, "%s/%s", path, filename);
+			
+			if(!(fat_get_stat(pathbuf) & 0x10)) {
+				fprintf(stderr, "Error: is not directory\n");
+				continue;
+			}
+			
+			for(files = 0; (i = fat_dirlist(pathbuf, list, 8, files)); files += i) {
+				for (j = i - 1; j >= 0; j--) {
+					if(list[j].filename[0]) {
+						if(!strcmp("..", list[j].filename) || !strcmp(".", list[j].filename))
+							continue;
+						fprintf(stderr, "Error: directory not empty\n");
+						goto no_rmdir;
+					}
+				}
+			}
+		
+			sprintf((char *) pathbuf, "%s/%s", path, filename);
+			delete_file(pathbuf);
+			no_rmdir:;
+		} else if(!strcmp(cmd, "edit")) {
+			if(!(filename = strtok(NULL, " \r\n")))
+				continue;
+			
+			if((fd = fat_open((char *) pathbuf, O_RDONLY)) < 0)
+				continue;
+			
+			size = 0;
+			while((tmp = fread(buff, 1, 512, stdin)) == 512) {
+				fat_write_sect(fd);
+				size += tmp;
+			}
+			if(tmp > 0) {
+				fat_write_sect(fd);
+				size += tmp;
+			}
+			
+			fat_close(fd);
+			fat_set_fsize(pathbuf, size);
 		} else {
 			fprintf(stderr, "Unknown command %s\n", cmd);
 		}
 	}
-	
-	//delete_file("/ARNE/LOLOL.ASD");
-	//delete_file("/ARNE");
-	//create_file(0, "TESTCASE", 0x10);
-	//create_file("/TESTCASE", "ARNE", 0x10);
-	//create_file("/TESTCASE/ARNE", "TEST.BIN", 0x0);
-
-	//fd = fat_open("/TESTCASE/ARNE/TEST.BIN", O_RDWR);
-	//size = fat_fsize(fd);
-	//fprintf(stderr, "fd=%i, size=%i\n", fd, size);
-	//for (i = 0; i < 129; i++) {
-	//	memset(sector_buff, i, 512);
-	//	fat_write_sect(fd);
-	//}
-
-	//fat_close(fd);
-
-	//create_file(0, "ARNE", 0x10);
-	//create_file(0, "ARNE", 0x10);
-	//create_file("/ARNE", "LOLOL.ASD", 0x10);
-	//create_file("/ARNE", "LOLOL.ASD", 0x10);
-	
-	//delete_file("/TESTCASE/ARNE/TEST.BIN");
-	//delete_file("/TESTCASE/ARNE");
-	//delete_file("/TESTCASE");
 
 	return 0;
 }
