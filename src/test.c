@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 #include "fat.h"
 
 FILE *fp;
@@ -37,6 +38,13 @@ static void print_filesize(uint32_t filesize) {
 		printf("%uk", filesize/1024U);
 	else
 		printf("%uM", filesize/(1024U*1024U));
+}
+
+static void strtoupper(char *str) {
+	while(*str) {
+		*str = toupper(*str);
+		str++;
+	}
 }
 
 int main(int argc, char **argv) {
@@ -75,16 +83,24 @@ int main(int argc, char **argv) {
 		if(!strcmp(cmd, "cd")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
+			strtoupper(filename);
 			
 			if(!strcmp(filename, "."))
 				continue;
 			if(!strcmp(filename, "..") && strcmp(path, "/")) {
+				goup:
 				*strrchr(path, '/') = 0;
 				continue;
 			}
 			
 			strcat(path, "/");
 			strcat(path, filename);
+			
+			stat = fat_get_stat(path);
+			if(stat == 0xFF || !(stat & 0x10)) {
+				fprintf(stderr, "Error: %s is not a directory\n", filename);
+				goto goup;
+			}
 		} else if(!strcmp(cmd, "pwd")) {
 			if(*path)
 				puts(path);
@@ -118,6 +134,7 @@ int main(int argc, char **argv) {
 		} else if(!strcmp(cmd, "cat")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
+			strtoupper(filename);
 			
 			sprintf((char *) pathbuf, "%s/%s", path, filename);
 			if((fd = fat_open((char *) pathbuf, O_RDONLY)) < 0)
@@ -136,30 +153,36 @@ int main(int argc, char **argv) {
 		} else if(!strcmp(cmd, "rm")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
+			strtoupper(filename);
 			
 			sprintf((char *) pathbuf, "%s/%s", path, filename);
-			if(fat_get_stat(pathbuf) & 0x10) {
-				fprintf(stderr, "Error: cannot rm directory\n");
+			stat = fat_get_stat(pathbuf);
+			if(stat == 0xFF || (stat & 0x10)) {
+				fprintf(stderr, "Error: %s does not exist or is a directory\n", filename);
 				continue;
 			}
 			delete_file(pathbuf);
 		} else if(!strcmp(cmd, "touch")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
+			strtoupper(filename);
 			
 			create_file(path, filename, 0x20);
 		} else if(!strcmp(cmd, "mkdir")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
+			strtoupper(filename);
 			
 			create_file(path, filename, 0x10);
 		} else if(!strcmp(cmd, "rmdir")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
+			strtoupper(filename);
 			
 			sprintf((char *) pathbuf, "%s/%s", path, filename);
 			
-			if(!(fat_get_stat(pathbuf) & 0x10)) {
+			stat = fat_get_stat(pathbuf) ;
+			if(stat == 0xFF || !(stat & 0x10)) {
 				fprintf(stderr, "Error: is not directory\n");
 				continue;
 			}
@@ -181,22 +204,27 @@ int main(int argc, char **argv) {
 		} else if(!strcmp(cmd, "edit")) {
 			if(!(filename = strtok(NULL, " \r\n")))
 				continue;
+			strtoupper(filename);
 			
-			if((fd = fat_open((char *) pathbuf, O_RDONLY)) < 0)
+			if((fd = fat_open((char *) pathbuf, O_WRONLY)) < 0)
 				continue;
 			
 			size = 0;
 			while((tmp = fread(buff, 1, 512, stdin)) == 512) {
+				printf("writing 512\n");
 				fat_write_sect(fd);
 				size += tmp;
 			}
 			if(tmp > 0) {
+				printf("writing %u\n", tmp);
 				fat_write_sect(fd);
 				size += tmp;
 			}
 			
 			fat_close(fd);
 			fat_set_fsize(pathbuf, size);
+		} else if(!strcmp(cmd, "exit")) {
+			return 0;
 		} else {
 			fprintf(stderr, "Unknown command %s\n", cmd);
 		}
