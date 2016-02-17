@@ -477,7 +477,7 @@ static uint32_t alloc_entry(uint32_t parent_entry_sector, uint32_t parent_entry_
 
 	for (;;) {
 		for (i = 0; i < fat_state.cluster_size; i++) {
-			if (read_sector(sector, sector_buff) < 0)
+			if (read_sector(sector + i, sector_buff) < 0)
 				return 0;
 			for (j = 0; j < 16; j++) {
 				if (old_sector) {
@@ -712,6 +712,8 @@ static bool folder_empty(uint32_t cluster) {
 			for (j = 0; j < 16; j++) {
 				if (sector_buff[j * 32 + 11] == 0xF)
 					continue;
+				if (sector_buff[j * 32] == 0)
+					return true;
 				if (sector_buff[j * 32] != 0xE5 && sector_buff[j * 32] && sector_buff[j * 32] != '.' && sector_buff[j * 32] != ' ')
 					return false;
 			}
@@ -851,7 +853,7 @@ void fat_set_fsize(const char *path, uint32_t size) {
 	if (!(sector = locate_record(path, &index, NULL)))
 		return;
 	read_sector(sector, sector_buff);
-	sector_buff[(index << 5) + 28] = size;
+	WRITE_DWORD(sector_buff, (index << 5) + 28, size);
 	write_sector(sector, sector_buff);
 	return;
 }
