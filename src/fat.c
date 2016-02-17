@@ -892,7 +892,7 @@ int fat_dirlist(const char *path, struct FATDirList *list, int size, int skip) {
 					continue;
 				if (!sector_buff[j * 32 + 11] && sector_buff[j * 32] == 0xE5)
 					continue;
-				if (!sector_buff[j * 32 + 11] && !sector_buff[j * 32])
+				if (!sector_buff[j * 32])
 					return found;
 				if (skip) {
 					skip--;
