@@ -360,14 +360,12 @@ static uint32_t locate_record(const char *path, int *record_index, const char *t
 		for (i = 0; i < 16; i++) {
 			if ((sector_buff[i * 32 + 11] & 0xF) == 0xF)	/* Long filename entry */
 				continue;
-			if (!sector_buff[i * 32 + 11]) {
-				if (!sector_buff[i * 32])	/* End of list */
-					return 0;
-				if (sector_buff[i * 32] == 0xE5)
-					/* Deleted record, skip */
-					continue;
-				/* This is a valid file */
-			}
+			if (!sector_buff[i * 32])	/* End of list */
+				return 0;
+			if (sector_buff[i * 32] == 0xE5)
+				/* Deleted record, skip */
+				continue;
+			/* This is a valid file */
 
 			if (!fat_memcmp((uint8_t *) fatname, &sector_buff[i * 32], 11)) {
 				recurse = true;
@@ -490,14 +488,12 @@ static uint32_t alloc_entry(uint32_t parent_entry_sector, uint32_t parent_entry_
 					return old_sector;
 				}
 
-				if (!sector_buff[j * 32 + 11]) {
-					if (sector_buff[j * 32] == 0xE5) {
-						*index = j;
-						return sector;
-					} else if (!sector_buff[j * 32]) {
-						*index = j;
-						old_sector = sector;
-					}
+				if (sector_buff[j * 32] == 0xE5) {
+					*index = j;
+					return sector;
+				} else if (!sector_buff[j * 32]) {
+					*index = j;
+					old_sector = sector;
 				}
 			}
 		}
@@ -528,14 +524,13 @@ static uint32_t alloc_entry_root(int *index) {
 
 		for (j = 0; j < 16; j++) {
 			if (!alloc) {
-				if (!sector_buff[j * 32 + 11]) {
+				if (sector_buff[j * 32] == 0xE5) {
 					*index = j;
-					if (sector_buff[j * 32] == 0xE5) {
-						return sector;
-					} else if (!sector_buff[j * 32]) {
-						alloc = true;
-						old_sector = sector;
-					}
+					return sector;
+				} else if (!sector_buff[j * 32]) {
+					*index = j;
+					alloc = true;
+					old_sector = sector;
 				}
 			} else {
 				sector_buff[j * 32] = 0;
