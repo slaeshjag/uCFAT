@@ -853,7 +853,7 @@ void fat_set_fsize(const char *path, uint32_t size) {
 	if (!(sector = locate_record(path, &index, NULL)))
 		return;
 	read_sector(sector, sector_buff);
-	WRITE_DWORD(sector_buff, (index << 5) + 28, size);
+	WRITE_DWORD(sector_buff, (index * 32) + 28, size);
 	write_sector(sector, sector_buff);
 	return;
 }
