@@ -206,6 +206,8 @@ int main(int argc, char **argv) {
 				continue;
 			strtoupper(filename);
 			
+			sprintf((char *) pathbuf, "%s/%s", path, filename);
+			
 			if((fd = fat_open((char *) pathbuf, O_WRONLY)) < 0)
 				continue;
 			
