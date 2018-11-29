@@ -31,7 +31,7 @@ freely, subject to the following restrictions:
 #include "fat.h"
 
 #define	MAX_FD_OPEN		4
-#define	READ_WORD(x, n)		((uint16_t) ((uint16_t) x[(n)] | (((uint16_t) x[(n) + 1]) << 8)))
+#define	READ_WORD(x, n)		((uint16_t) ((uint16_t) (x[(n)]) | (((uint16_t) (x[(n) + 1])) << 8)))
 #define	READ_DWORD(x, n)	read_dword(x, n)
 #define	WRITE_WORD(x, n, w)	((x)[(n)] = (w & 0xFF), (x)[(n) + 1] = ((w) >> 8) & 0xFF)
 #define	WRITE_DWORD(x, n, dw)	write_dword(x, n, dw)
@@ -629,9 +629,49 @@ uint32_t fat_ftell(int fd) {
 }
 
 
+bool fat_seek(int fd, uint32_t pos) {
+	int i, current_cluster_index, target_cluster_index, current_cluster, old_cluster;
+
+	if (fd < 0)
+		return false;
+	for (i = 0; i < MAX_FD_OPEN; i++)
+		if (fat_fd[i].key == fd)
+			break;
+	if (i == MAX_FD_OPEN)
+		return false;
+	if (!fat_fd[i].current_cluster)
+		return false;
+	if (pos >= fat_fd[i].file_size && !fat_fd[i].write)
+		pos = fat_fd[i].file_size & (~0x1FF);
+	target_cluster_index = (pos >> 9) / fat_state.cluster_size;
+	current_cluster_index = (fat_fd[i].fpos >> 9) / fat_state.cluster_size;
+	current_cluster = fat_fd[i].current_cluster;
+
+	if (current_cluster_index == target_cluster_index) {
+		fat_fd[i].fpos = pos;
+		return true;
+	}
+	
+	if (current_cluster_index > target_cluster_index)
+		current_cluster_index = 0, current_cluster = fat_fd[i].first_cluster;
+	
+	for (; current_cluster_index < target_cluster_index; current_cluster_index++) {
+		old_cluster = current_cluster;
+		if (!(current_cluster = next_cluster(current_cluster)))
+			current_cluster = alloc_cluster(fat_fd[i].entry_sector, fat_fd[i].entry_index, old_cluster);
+		if (!current_cluster)
+			return false;
+	}
+
+	fat_fd[i].current_cluster = current_cluster;
+	fat_fd[i].fpos = pos;
+	return true;
+}
+
+
 bool fat_read_sect(int fd) {
 	int i;
-	uint32_t old_cluster, sector;
+	uint32_t /*old_cluster, */sector;
 	
 	if (fd < 0)
 		return false;
@@ -650,10 +690,10 @@ bool fat_read_sect(int fd) {
 	if (fat_fd[i].file_size < fat_fd[i].fpos)
 		fat_fd[i].fpos = fat_fd[i].file_size & (~0x1FF);
 	if (!(fat_fd[i].fpos % (fat_state.cluster_size * 512))) {
-		old_cluster = fat_fd[i].current_cluster;
+		//old_cluster = fat_fd[i].current_cluster;
 		fat_fd[i].current_cluster = next_cluster(fat_fd[i].current_cluster);
-		if (!fat_fd[i].current_cluster && fat_fd[i].write)
-			fat_fd[i].current_cluster = alloc_cluster(fat_fd[i].entry_sector, fat_fd[i].entry_index, old_cluster);
+		//if (!fat_fd[i].current_cluster && fat_fd[i].write)
+		//	fat_fd[i].current_cluster = alloc_cluster(fat_fd[i].entry_sector, fat_fd[i].entry_index, old_cluster);
 	}
 	
 	if (read_sector(sector, sector_buff) < 0)
