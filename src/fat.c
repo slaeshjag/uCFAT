@@ -431,8 +431,8 @@ static uint32_t alloc_cluster(uint32_t entry_sector, uint32_t entry_index, uint3
 						WRITE_WORD(sector_buff, (old_cluster & mask) << shift, cluster);
 					else
 						WRITE_DWORD(sector_buff, (old_cluster & mask) << shift, cluster);
-					write_sector(fat_state.fat_pos + i, sector_buff);
-					if (write_sector(fat_state.fat_pos + fat_state.fat_size + i, sector_buff) < 0)
+					write_sector(fat_state.fat_pos + old_cluster / ent_per_sec, sector_buff);
+					if (write_sector(fat_state.fat_pos + fat_state.fat_size + old_cluster / ent_per_sec, sector_buff) < 0)
 						return 0;
 				}
 
