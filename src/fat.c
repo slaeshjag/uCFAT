@@ -22,12 +22,9 @@ freely, subject to the following restrictions:
 	distribution.
 */
 
-#ifndef NULL
-#define	NULL	((void *) 0)
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "fat.h"
 
 #define	MAX_FD_OPEN		4
@@ -381,7 +378,8 @@ static uint32_t locate_record(const char *path, int *record_index, const char *t
 			}
 		}
 
-		if (cur_sector / fat_state.cluster_size != (cur_sector + 1) / fat_state.cluster_size) {
+//		if (cur_sector / fat_state.cluster_size != (cur_sector + 1) / fat_state.cluster_size) {
+		if (sector_to_cluster(cur_sector) != sector_to_cluster(cur_sector + 1)) {
 			cur_sector = cluster_to_sector(next_cluster(sector_to_cluster(cur_sector)));
 			if (!cur_sector)
 				return 0;
